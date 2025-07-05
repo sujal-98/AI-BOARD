@@ -8,7 +8,12 @@ const path = require('path');
 const app = express();
 const port = 3000;
 
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:3001',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 app.use(express.json());
 
 const storage = multer.memoryStorage();
@@ -34,6 +39,31 @@ const PYTHON_API_URL = 'http://localhost:8000';
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Node.js backend is running' });
 });
+
+
+app.post('/solve-formula', async (req, res) => {
+    console.log(req.body);
+    try {
+        const response = await axios.post(`${PYTHON_API_URL}/solve-formula/`, {
+            formula: req.body.formula
+        });
+        if (response.status === 200) {
+            res.json(response.data);
+        } else {
+            res.status(response.status).json({
+                status: 'error',
+                message: response.data.detail || 'Error from Python API'
+            });
+    }
+    }
+    catch (error) {
+        console.error('Error solving formula:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error.message || 'Internal server error'
+        });
+    }}
+);
 
 // Endpoint to process image and get formula
 app.post('/process-image', upload.single('image'), async (req, res) => {

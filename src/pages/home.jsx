@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
+import 'katex/dist/katex.min.css';
+import { InlineMath, BlockMath } from 'react-katex';
+import axios from 'axios';
 
 const Home = () => {
-  // Initialize state and refs
   const [darkMode, setDarkMode] = useState(false);
   const [markerColor, setMarkerColor] = useState('#000000');
   const [lineWidth, setLineWidth] = useState(5);
@@ -10,17 +12,6 @@ const Home = () => {
   const [showResult, setShowResult] = useState(false);
   const [error, setError] = useState(null);
   
-  
-  // Update marker color when dark mode changes
-  useEffect(() => {
-    // Set default marker color to white if in dark mode and current color is black
-    if (darkMode && markerColor === '#000000') {
-      setMarkerColor('#ffffff');
-    } else if (!darkMode && markerColor === '#ffffff') {
-      // Set default marker color to black if switching to light mode and current color is white
-      setMarkerColor('#000000');
-    }
-  }, [darkMode, markerColor]);
   const [tool, setTool] = useState('pencil'); // pencil, eraser, clear
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
@@ -326,6 +317,64 @@ const Home = () => {
     marginLeft: 'auto'
   };
 
+  const calculateButtonStyle = {
+    padding: '0.75rem 1.5rem',
+    border: 'none',
+    borderRadius: '8px',
+    backgroundColor: darkMode ? '#2196f3' : '#1976d2',
+    color: '#ffffff',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    marginTop: '1rem',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 2px 8px rgba(33, 150, 243, 0.3)',
+    width: 'fit-content'
+  };
+
+  const calculateButtonHoverStyle = {
+    ...calculateButtonStyle,
+    backgroundColor: darkMode ? '#1976d2' : '#1565c0',
+    transform: 'translateY(-1px)',
+    boxShadow: '0 4px 12px rgba(33, 150, 243, 0.4)'
+  };
+
+  const handleCalculate = async () => {
+    if (result && result.formula) {
+      try {
+        // For now, just show an alert with the formula
+        // You can extend this to actually evaluate the mathematical expression
+        console.log(result.formula);
+        const response = await axios.post('http://localhost:3000/solve-formula', {
+          formula: result.formula
+        });
+        console.log(response.data);
+        setResult(response.data);
+        setShowResult(true);
+        setError(null);
+        setIsProcessing(false);
+        setTool('pencil');
+        clearCanvas();
+        setResult(response.data);
+        setShowResult(true);
+        setError(null);
+        setIsProcessing(false);
+      } catch (error) {
+        console.error('Error calculating:', error);
+        alert('Error calculating the formula');
+        setError(error.message);
+        setIsProcessing(false);
+        setTool('pencil');
+        clearCanvas();
+        setResult(null);
+        setShowResult(false);
+      }
+    }
+  };
+
   const processImage = async () => {
     try {
       setIsProcessing(true);
@@ -341,13 +390,18 @@ const Home = () => {
       
       // Create form data
       const formData = new FormData();
-      formData.append('image', blob, 'canvas-image.png');
+      formData.append('file', blob, 'canvas-image.png');
       
       // Send to backend
-      const result = await fetch('http://localhost:3000/process-image', {
+      const result = await fetch('http://localhost:8000/recognize-formula/', {
         method: 'POST',
         body: formData
       });
+      
+      if (!result.ok) {
+        const errorData = await result.json();
+        throw new Error(errorData.detail || 'Failed to process image');
+      }
       
       const data = await result.json();
       
@@ -467,18 +521,35 @@ const Home = () => {
               <>
                 <div style={{ marginBottom: '1rem' }}>
                   <strong>LaTeX Formula:</strong>
-                  <pre style={{ 
+                  <div style={{ 
                     backgroundColor: darkMode ? '#1e1e1e' : '#ffffff',
-                    padding: '0.5rem',
+                    padding: '1rem',
                     borderRadius: '4px',
-                    overflowX: 'auto'
+                    overflowX: 'auto',
+                    marginTop: '0.5rem'
                   }}>
-                    {result.formula}
-                  </pre>
+                    <BlockMath math={result.formula} />
+                  </div>
                 </div>
-                <div style={{ color: darkMode ? '#b0b0b0' : '#666666' }}>
+                <div style={{ color: darkMode ? '#b0b0b0' : '#666666', marginBottom: '1rem' }}>
                   {result.explanation}
                 </div>
+                <button
+                  style={calculateButtonStyle}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = darkMode ? '#1976d2' : '#1565c0';
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = '0 4px 12px rgba(33, 150, 243, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = darkMode ? '#2196f3' : '#1976d2';
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 2px 8px rgba(33, 150, 243, 0.3)';
+                  }}
+                  onClick={handleCalculate}
+                >
+                  🧮 Calculate
+                </button>
               </>
             )}
           </div>
